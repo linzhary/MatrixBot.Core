@@ -1,22 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+﻿using System.Text.Json.Serialization;
 
-namespace Matrix.Bot.Core.Event;
+namespace MatrixBot.Core.Event;
 
 public class MatrixBotRoomEvent
 {
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = default!;
+    [JsonPropertyName("sender")]
+    public string Sender { get; set; } = default!;
     [JsonPropertyName("content")]
     public MatrixBotRoomEventContent? Content { get; set; }
-    [JsonPropertyName("type")]
-    public string? Type { get; set; }
     [JsonPropertyName("event_id")]
-    public string? EventId { get; set; }
-    [JsonPropertyName("sender")]
-    public string? Sender { get; set; }
+    public string EventId { get; set; } = default!;
 }
 
 public class MatrixBotRoomEventContent

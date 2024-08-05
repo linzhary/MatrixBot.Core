@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Matrix.Bot.Core\Matrix.Bot.Core.csproj" />
+    <ProjectReference Include="..\MatrixBot.Core\MatrixBot.Core.csproj" />
   </ItemGroup>
 </Project>
 

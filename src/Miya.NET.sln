@@ -5,7 +5,7 @@ VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miya.NET", "Miya.NET\Miya.NET.csproj", "{119767B2-22E6-448B-9D26-516BD46E0494}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Matrix.Bot.Core", "Matrix.Bot.Core\Matrix.Bot.Core.csproj", "{8AD8917F-8E61-4DC9-869A-8D3F20B658CD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MatrixBot.Core", "MatrixBot.Core\MatrixBot.Core.csproj", "{8AD8917F-8E61-4DC9-869A-8D3F20B658CD}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5EB813B1-0886-4BC9-A3F6-1B423DA90A0E}"
 	ProjectSection(SolutionItems) = preProject

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Matrix.Bot.Core.Event;
+namespace MatrixBot.Core.Event;
 
 internal class MatrixBotSyncEvent
 {

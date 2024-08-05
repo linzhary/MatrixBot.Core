@@ -1,27 +1,56 @@
-﻿using Matrix.Bot.Core.Common;
-using Matrix.Bot.Core.Event;
+﻿using MatrixBot.Core.Common;
+using MatrixBot.Core.Event;
+using MatrixBot.Core.Handler;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
-using System;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Threading;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
-namespace Matrix.Bot.Core;
+namespace MatrixBot.Core;
 
-public class MatrixBot
+public class LoggingHandler() : DelegatingHandler(new HttpClientHandler())
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Log.Debug("Request: {Method} {Uri}", request.Method, request.RequestUri);
+
+        if (request.Content != null)
+        {
+            var requestContent = await request.Content.ReadAsStringAsync(cancellationToken);
+            Log.Debug("Request Content: {RequestContent}", requestContent);
+        }
+
+        var response = await base.SendAsync(request, cancellationToken);
+
+        Log.Debug("Response: {StatusCode}", response.StatusCode);
+
+        if (response.Content != null)
+        {
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            Log.Debug("Response Content: {ResponseJson}", responseContent);
+        }
+
+        return response;
+    }
+}
+
+public class MatrixBotClient
 {
     internal readonly HttpClient _httpClient;
     internal readonly MatrixBotCache _botConfig;
     private readonly int _syncTimeout;
-    private readonly Dictionary<Type,IMatrixBotEventHandler> _eventHandlers = [];
+    private readonly List<IMatrixBotEventHandler> _eventHandlers = [
+        new MatrixBotEventLoggerHandler()
+        ];
     /// <summary>
     /// 
     /// </summary>
     /// <param name="syncTimeout">同步超时时间</param>
     /// <param name="httpTimeout">请求超时时间</param>
-    public MatrixBot(int syncTimeout = 30000, int httpTimeout = 60000)
+    public MatrixBotClient(int syncTimeout = 30000, int httpTimeout = 60000)
     {
         _syncTimeout = syncTimeout;
         // 配置 Serilog
@@ -45,7 +74,7 @@ public class MatrixBot
     /// <returns></returns>
     private async Task ConnectAsync()
     {
-        _httpClient.BaseAddress = new Uri($"{_botConfig.ServerUrl!.Trim('/')}/_matrix/client/v3/");
+        _httpClient.BaseAddress = new Uri($"{_botConfig.ServerUrl!.Trim('/')}/_matrix/");
         if (string.IsNullOrEmpty(_botConfig.AccessToken))
         {
             var res = await _httpClient.PostAsJsonAsync("login", new
@@ -67,6 +96,25 @@ public class MatrixBot
             var _ = _botConfig.SaveAsync();
         }
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _botConfig.AccessToken);
+    }
+
+    /// <summary>
+    /// 注册一个处理插件
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public void Register<T>() where T : IMatrixBotEventHandler
+    {
+        _eventHandlers.Add(Activator.CreateInstance<T>());
+    }
+
+    /// <summary>
+    /// 注册一个处理器
+    /// </summary>
+    /// <param name="onEventAsync"></param>
+    public void Register(Func<MatrixBotContext, Task> onEventAsync)
+    {
+        _eventHandlers.Add(new ActionMatrixBotEventHandler(onEventAsync));
     }
 
     /// <summary>
@@ -127,10 +175,10 @@ public class MatrixBot
         queryMap.Add("timeout", _syncTimeout.ToString());
 
         var queryString = string.Join('&', queryMap.Select(x => $"{x.Key}={x.Value}"));
-        var responseMessage = await _httpClient.GetAsync($"sync?_=1&{queryString}", cancellationToken);
+        var responseMessage = await _httpClient.GetAsync($"client/v3/sync?_=1&{queryString}", cancellationToken);
         responseMessage.EnsureSuccessStatusCode();
 
-        var response = await responseMessage.Content.ReadFromJsonAsync<MatrixBotSyncEvent>(cancellationToken) ?? throw new HttpRequestException();
+        var response = await responseMessage.Content.ReadFromJsonAsync<MatrixBotSyncEvent>(Global.JsonSerializerOptions, cancellationToken) ?? throw new HttpRequestException();
         if (_botConfig.Since != response.NextBatch)
         {
             _botConfig.Since = response.NextBatch;
@@ -141,7 +189,6 @@ public class MatrixBot
         if (response.Rooms.Join is null) return;
         foreach (var room in response.Rooms.Join)
         {
-            var roomId = room.Key;
             if (room.Value is null) continue;
             if (room.Value.TimeLine is null) continue;
             if (room.Value.TimeLine.Events is null) continue;
@@ -149,23 +196,23 @@ public class MatrixBot
             {
                 if (e.Sender != _botConfig.UserId)
                 {
-                    var args = new MatrixBotEventArgs()
+                    var ctx = new MatrixBotContext
                     {
-                        RoomId = roomId,
-                        Event = e
+                        RoomId = room.Key,
+                        Event = e,
+                        Client = this
                     };
-                    var _ = _eventHandlers.Values.Select(x => x.OnEventAsync(this, args));
+                    await Task.Run(async () =>
+                    {
+                        foreach (var eventHandler in _eventHandlers)
+                        {
+                            await eventHandler.OnEventAsync(ctx);
+                        }
+                    }, cancellationToken);
                 }
             }
         }
     }
-
-    /// <summary>
-    /// 注册一个插件
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <returns></returns>
-    public bool Register<T>() where T : IMatrixBotEventHandler => _eventHandlers.TryAdd(typeof(T), Activator.CreateInstance<T>());
 
     /// <summary>
     /// 发送原始消息
@@ -174,13 +221,42 @@ public class MatrixBot
     /// <param name="roomId"></param>
     /// <param name="content"></param>
     /// <returns></returns>
-    public async Task<string> SendRawMessageAsync(string roomId, string content)
+    public async Task<string> SendRawMessageAsync<T>(string roomId, T content)
     {
-        var res = await _httpClient.PostAsJsonAsync($"rooms/{Uri.EscapeDataString(roomId)}/send/m.room.message", content);
+        var res = await _httpClient.PostAsJsonAsync(
+            $"client/v3/rooms/{Uri.EscapeDataString(roomId)}/send/m.room.message",
+            content,
+            Global.JsonSerializerOptions
+            );
+
         res.EnsureSuccessStatusCode();
 
         var resJson = await res.Content.ReadFromJsonAsync<JsonElement>();
 
         return resJson.GetProperty("event_id").GetString()!;
+    }
+
+    /// <summary>
+    /// 上传媒体文件
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="url"></param>
+    /// <returns></returns>
+    public async Task<string> UploadMediaFileAsync(string name, string url)
+    {
+        string content_uri;
+        {
+            var res = await _httpClient.PostAsync($"media/v1/create", default);
+            res.EnsureSuccessStatusCode();
+            var resJson = await res.Content.ReadFromJsonAsync<JsonElement>(Global.JsonSerializerOptions);
+            content_uri = resJson.GetProperty("content_uri").GetString()?.Replace("mxc://", string.Empty)!;
+        }
+        {
+            using var httpClient = new HttpClient();
+            using var httpStream = await httpClient.GetStreamAsync(url);
+            var res = await _httpClient.PutAsync($"media/v3/upload/{content_uri}?fileName={name}", new StreamContent(httpStream));
+            res.EnsureSuccessStatusCode();
+        }
+        return $"mxc://{content_uri}";
     }
 }

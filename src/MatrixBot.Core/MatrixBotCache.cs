@@ -1,13 +1,7 @@
 ﻿using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
-namespace Matrix.Bot.Core;
+namespace MatrixBot.Core;
 
 public class MatrixBotCache
 {
@@ -20,10 +14,6 @@ public class MatrixBotCache
     public string? Since { get; set; }
 
     private const string FILE_NAME = "client.cache";
-    private static readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions
-    {
-        PropertyNameCaseInsensitive = true
-    };
     /// <summary>
     /// 从磁盘加载配置文件
     /// </summary>
@@ -38,7 +28,7 @@ public class MatrixBotCache
         try
         {
             var configJson = await File.ReadAllTextAsync(FILE_NAME);
-            var obj = JsonSerializer.Deserialize<MatrixBotCache>(configJson, _serializerOptions);
+            var obj = JsonSerializer.Deserialize<MatrixBotCache>(configJson, Global.JsonSerializerOptions);
             if (obj is null) return false;
             if (obj.ServerUrl is not null && obj.ServerUrl != serverUrl) return false;
             if (obj.UserName is not null && obj.UserName != userName) return false;
@@ -58,7 +48,7 @@ public class MatrixBotCache
 
     internal async Task SaveAsync()
     {
-        var json = JsonSerializer.Serialize(this);
+        var json = JsonSerializer.Serialize(this, Global.JsonSerializerOptions);
         await File.WriteAllTextAsync(FILE_NAME, json);
     }
 }
