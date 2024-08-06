@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace MatrixBot.Core;
 
-public class MatrixBotCache
+public class Storage
 {
     public string? ServerUrl { get; set; }
     public string? DeviceId { get; set; }
@@ -28,7 +28,7 @@ public class MatrixBotCache
         try
         {
             var configJson = await File.ReadAllTextAsync(FILE_NAME);
-            var obj = JsonSerializer.Deserialize<MatrixBotCache>(configJson, Global.JsonSerializerOptions);
+            var obj = JsonSerializer.Deserialize<Storage>(configJson, Global.JsonSerializerOptions);
             if (obj is null) return false;
             if (obj.ServerUrl is not null && obj.ServerUrl != serverUrl) return false;
             if (obj.UserName is not null && obj.UserName != userName) return false;

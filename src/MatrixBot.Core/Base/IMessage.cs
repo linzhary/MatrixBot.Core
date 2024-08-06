@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace MatrixBot.Core;
 
-public class MatrixBotException : Exception
+public interface IMessage
 {
-    public bool Success { get; set; } = false;
 }

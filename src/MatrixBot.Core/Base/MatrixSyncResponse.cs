@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace MatrixBot.Core.Event;
+namespace MatrixBot.Core;
 
-internal class MatrixBotSyncEvent
+internal class MatrixSyncResponse
 {
     [JsonPropertyName("next_batch")]
     public string? NextBatch { get; set; }
@@ -23,7 +23,7 @@ internal class MatrixBotSyncEvent
             public class _TimeLine
             {
                 [JsonPropertyName("events")]
-                public List<MatrixBotRoomEvent>? Events { get; set; }
+                public List<MatrixEvent>? Events { get; set; }
             }
         }
     }
