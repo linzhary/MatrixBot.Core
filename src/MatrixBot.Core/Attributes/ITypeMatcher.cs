@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MatrixBot.Core;
 
-public interface ITypeMatcherAttribute: IMatrixAttribute
+public interface ITypeMatcher: IMatrixAction
 {
-    abstract string MsgType { get; }
+    abstract string EventType { get; }
 }

@@ -3,56 +3,22 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Miya.NET;
 
-public class Setu : MatrixApplication
+public class Setu : MatrixService
 {
-    private Timer timer = default!;
-    private readonly ConcurrentQueue<Dictionary<string, object>> setuMessageQueue = new();
-    private async Task cacheSetuAsync(MatrixBotClient client)
-    {
-        timer.Change(Timeout.Infinite, Timeout.Infinite);
-        if (setuMessageQueue.Count >= 7) return;
-        Log.Information("涩图缓存数量不足7张，开始加载涩图缓存……");
-        var resJson = await HttpClientFactory.Default.GetFromJsonAsync<JsonElement>("https://api.lolicon.app/setu/v2?num=5&r18=1&size=regular");
-        foreach (var item in resJson.GetProperty("data").EnumerateArray())
-        {
-            var url = item.GetProperty("urls").GetProperty("regular").GetString()!;
-            var fileInfo = await HttpClientFactory.DownloadAsync(url);
-            if (fileInfo is null)
-            {
-                continue;
-            }
-            using (fileInfo.FileStream)
-            {
-                //上传媒体文件
-                var content_uri = await client.UploadMediaAsync(fileInfo.FileName, fileInfo.FileStream);
-                setuMessageQueue.Enqueue(new()
-                {
-                    { "msgtype" , "m.image" },
-                    { "body" , fileInfo.FileName },
-                    { "url" , content_uri },
-                    { "info", new Dictionary<string, object>()
-                        {
-                            { "size", fileInfo.FileSize },
-                            { "mimetype", fileInfo.MediaType },
-                        }
-                    }
-                });
-            }
-        }
-        // 停止定时器
-        timer.Change(0, 1000);
-    }
     public override Task OnReadyAsync(MatrixBotClient client)
     {
-        timer = new(_ => Task.Run(async () => await cacheSetuAsync(client)), default, 0, 1000);
+        //timer = new(_ => Task.Run(async () => await cacheSetuAsync(client)), default, 0, 1000);
         return Task.CompletedTask;
     }
 
@@ -63,8 +29,8 @@ public class Setu : MatrixApplication
         return Task.CompletedTask;
     }
 
-    [Room.OnRegex(@"^来(\d+)?[张份][色涩]图$")]
-    public async Task GetAsync(Context<Room.Message> ctx)
+    [Room.OnMessage(@"^来\s*?(\d+)?\s*?[张份](\w+)?[色涩]图$")]
+    public async Task GetByKeywordAsync(Context<Room.Message> ctx)
     {
         var numString = ctx.MatchResult!.Groups[1].Value;
         var num = string.IsNullOrWhiteSpace(numString) ? 1 : Convert.ToInt32(numString);
@@ -73,24 +39,64 @@ public class Setu : MatrixApplication
             await ctx.ReplyAsync(new()
                 {
                     { "msgtype" , "m.text" },
-                    { "body" , "一次不许看这么多哦~" },
+                    { "body" , "一次不许看这么多哦❤️杂鱼~" },
                 });
             return;
         }
-        while (setuMessageQueue.Count < num)
+        var keyword = ctx.MatchResult!.Groups[2].Value;
+        try
         {
-            await cacheSetuAsync(ctx.Client);
+            while (num > 0)
+            {
+                var resJson = await HttpClientFactory.Default.GetFromJsonAsync<JsonElement>($"https://api.lolicon.app/setu/v2?num={num}&r18=1&size=small&keyword={keyword}");
+                var data = resJson.GetProperty("data").EnumerateArray();
+                if (!data.Any())
+                {
+                    await ctx.ReplyAsync(new()
+                    {
+                        { "msgtype" , "m.text" },
+                        { "body" , "一张也没有哦❤️杂鱼~" },
+                    });
+                    return;
+                }
+                foreach (var item in data)
+                {
+                    var url = item.GetProperty("urls").GetProperty("small").GetString()!;
+                    var width = item.GetProperty("width").GetDecimal()!;
+                    var height = item.GetProperty("height").GetDecimal()!;
+                    var mediaInfo = await HttpClientFactory.DownloadAsync(url);
+                    if (mediaInfo is null)
+                    {
+                        continue;
+                    }
+                    using (mediaInfo.FileStream)
+                    {
+                        //上传媒体文件
+                        mediaInfo.MatrixUrl = await ctx.Client.UploadMediaAsync(mediaInfo.FileName, mediaInfo.FileStream);
+                        await ctx.SendAsync(new Dictionary<string, object>()
+                        {
+                            { "msgtype" , "m.image" },
+                            { "body" , mediaInfo.FileName },
+                            { "url" , mediaInfo.MatrixUrl },
+                            { "info", new Dictionary<string, object?>()
+                                {
+                                    { "size", mediaInfo.FileSize },
+                                    { "mimetype", mediaInfo.MediaType },
+                                    { "w",width },
+                                    { "h",height },
+                                    { "thumbnail_url", mediaInfo.MatrixUrl }
+                                }
+                            }
+                        });
+                        num--;
+                    }
+                    await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                }
+            }
         }
-        for (var i = 0; i < num; i++)
+        catch (Exception ex)
         {
-            if (setuMessageQueue.TryDequeue(out var message))
-            {
-                await ctx.ReplyAsync(message);
-            }
-            else
-            {
-                i--;
-            }
+            Log.Error(ex, "预加载涩图出错");
         }
     }
 }

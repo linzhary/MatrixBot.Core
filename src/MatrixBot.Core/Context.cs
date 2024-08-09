@@ -3,20 +3,20 @@ using System.Text.RegularExpressions;
 
 namespace MatrixBot.Core;
 
-public static class Context
+public abstract class Context
 {
-    private static readonly Dictionary<string, Func<MatrixBotClient, string, MatrixEvent, object>> _converters = [];
+    private static readonly Dictionary<string, Func<MatrixBotClient, string, MatrixEvent, Context>> _converters = [];
     static Context()
     {
         _converters.Add(M.Room.Message, (client, roomId, evt) => new Context<Room.Message>(client, roomId, evt));
     }
-    internal static object? TryConvert(MatrixBotClient client, string roomId, MatrixEvent evt)
+    internal static Context? TryConvert(MatrixBotClient client, string roomId, MatrixEvent evt)
     {
         var converter = _converters.GetValueOrDefault(evt.Type);
         return converter?.Invoke(client, roomId, evt);
     }
 }
-public class Context<T>
+public class Context<T> : Context
 {
     public string RoomId { get; set; } = default!;
     public string EventId { get; set; } = default!;
@@ -61,5 +61,10 @@ public class Context<T>
             replyContent.Add(item.Key, item.Value);
         }
         await Client.SendRawMessageAsync(RoomId, replyContent);
+    }
+
+    public async Task SendAsync(Dictionary<string, object> args)
+    {
+        await Client.SendRawMessageAsync(RoomId, args);
     }
 }

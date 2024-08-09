@@ -12,10 +12,10 @@ namespace MatrixBot.Core
 {
     public class Room
     {
-        [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
-        public class OnRegexAttribute([StringSyntax(StringSyntaxAttribute.Regex)] string pattern) : Attribute, IRuleMatcherAttribute, ITypeMatcherAttribute
+        [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+        public class OnMessage([StringSyntax(StringSyntaxAttribute.Regex)] string pattern = ".*") : Attribute, IRuleMatcher, ITypeMatcher
         {
-            public string MsgType => "m.room.message";
+            public string EventType => "m.room.message";
 
             public virtual bool IsMatch(object? args)
             {
@@ -26,17 +26,6 @@ namespace MatrixBot.Core
                 }
                 return false;
             }
-        }
-
-        [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
-        public class OnMessageAttribute() : OnRegexAttribute(".*")
-        {
-        }
-
-
-        [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
-        public class OnFullMatchAttribute(string body) : OnRegexAttribute($"^{body}$")
-        {
         }
 
         public class Message : IMessage

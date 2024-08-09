@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 namespace MatrixBot.Core;
 
-public interface IRuleMatcherAttribute : IMatrixAttribute
+public interface IRuleMatcher : IMatrixAction
 {
     bool IsMatch(object? args);
 }

@@ -3,13 +3,6 @@ using Serilog;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Reflection;
-using static System.Net.Mime.MediaTypeNames;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-using System;
-using System.Collections.Concurrent;
-using System.Xml.Linq;
 
 namespace MatrixBot.Core;
 
@@ -17,7 +10,6 @@ public class MatrixBotClient : IDisposable
 {
     internal readonly HttpClient _httpClient;
     internal readonly Storage _storage;
-    private readonly MatrixAppContainer _container = new();
     private readonly int _syncTimeout;
     /// <summary>
     /// 
@@ -29,10 +21,20 @@ public class MatrixBotClient : IDisposable
         _syncTimeout = syncTimeout;
         // 配置 Serilog
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
+            .MinimumLevel.Debug()
             .WriteTo.Console(
+                restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
                 theme: AnsiConsoleTheme.Code) // 选择一个主题
+            .WriteTo.File(
+                path: "logs/log-.txt",      // 基础文件路径，"-"表示文件名中包含日期
+                rollingInterval: RollingInterval.Day, // 按天轮转
+                rollOnFileSizeLimit: true,  // 达到文件大小限制时轮转
+                fileSizeLimitBytes: 10_000_000, // 文件大小限制，单位：字节（此处为10MB）
+                retainedFileCountLimit: 7,  // 保留的日志文件数量限制
+                shared: true, // 共享文件（如果多个进程写入同一个文件）
+                outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+            )
             .CreateLogger();
 
         _httpClient = HttpClientFactory.CreateClient();
@@ -92,7 +94,7 @@ public class MatrixBotClient : IDisposable
             };
             Log.Information("Started MatrixBot.");
 
-            await Task.Run(() => _container.InitAsync(this, cancellationTokenSource.Token));
+            await Task.Run(() => MatrixServiceProvider.Instance.OnReadyAsync(this, cancellationTokenSource.Token));
 
             while (!cancellationTokenSource.IsCancellationRequested)
             {
@@ -105,9 +107,6 @@ public class MatrixBotClient : IDisposable
                     Log.Error(ex, "Error Occured");
                 }
             }
-        }
-        catch (TaskCanceledException)
-        {
         }
         catch (Exception ex)
         {
@@ -149,37 +148,17 @@ public class MatrixBotClient : IDisposable
             if (room.Value.TimeLine.Events is null) continue;
             foreach (var e in room.Value.TimeLine.Events)
             {
-               if(! _container.TryGetService(e.Type, out var appServices)) continue;
+                if (!MatrixServiceProvider.Instance.TryGetEndpoints(e.Type, out var endpoints)) continue;
                 var ctx = Context.TryConvert(this, room.Key, e);
-                var appServiceEnumerator = appServices.GetEnumerator();
-                while (!cancellationToken.IsCancellationRequested && appServiceEnumerator.MoveNext())
+                foreach (var endpoint in endpoints)
                 {
-                    if (appServiceEnumerator.Current!.RuleMatchers.Any(x => x.IsMatch(ctx)))
+                    if (cancellationToken.IsCancellationRequested) return;
+                    if (endpoint.RuleMatchers.Any(x => x.IsMatch(ctx)))
                     {
-                        var ret = appServiceEnumerator.Current.Delegate.DynamicInvoke(ctx);
-                        if (ret is Task retTask)
-                        {
-                            await retTask.ConfigureAwait(false);
-                        }
+                        await endpoint.InvokeAsync(ctx);
                     }
                 }
             }
-        }
-    }
-
-    /// <summary>
-    /// 扫描应用
-    /// </summary>
-    /// <param name="assembly"></param>
-    public void ScanApplication(Assembly assembly)
-    {
-        var applicationTypes = assembly.GetExportedTypes()
-            .Where(x => x.IsAssignableTo(typeof(MatrixApplication)))
-            .ToList();
-
-        foreach (var applicationType in applicationTypes)
-        {
-            _container.Register(applicationType);
         }
     }
 

@@ -6,6 +6,6 @@ using System.Threading.Tasks;
 
 namespace MatrixBot.Core;
 
-public interface IMatrixAttribute
+public interface IMatrixAction
 {
 }

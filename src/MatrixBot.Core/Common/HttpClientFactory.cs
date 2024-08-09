@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Mime;
 
 namespace MatrixBot.Core;
 
@@ -12,21 +13,24 @@ public static class HttpClientFactory
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Log.Debug("Request: {Method} {Uri}", request.Method, request.RequestUri);
-
-            if (request.Content != null)
+            if (request.Content?.Headers.ContentType?.MediaType != null)
             {
-                var requestContent = await request.Content.ReadAsStringAsync(cancellationToken);
-                Log.Debug("Request Content: {RequestContent}", requestContent);
+                if (request.Content.Headers.ContentType.MediaType.Equals(MediaTypeNames.Application.Json, StringComparison.OrdinalIgnoreCase))
+                {
+                    var requestJson = await request.Content.ReadAsStringAsync(cancellationToken);
+                    Log.Debug("Request Content: {RequestJson}", requestJson);
+                }
             }
-
             var response = await base.SendAsync(request, cancellationToken);
 
             Log.Debug("Response: {StatusCode}", response.StatusCode);
-
-            if (response.Content != null)
+            if (response.Content?.Headers.ContentType?.MediaType != null)
             {
-                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                Log.Debug("Response Content: {ResponseJson}", responseContent);
+                if (response.Content.Headers.ContentType.MediaType.Equals(MediaTypeNames.Application.Json, StringComparison.OrdinalIgnoreCase))
+                {
+                    var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                    Log.Debug("Response Content: {ResponseJson}", responseJson);
+                }
             }
 
             return response;
@@ -58,7 +62,7 @@ public static class HttpClientFactory
         return null;
     }
 
-    public static async Task<MatrixFileInfo?> DownloadAsync(string fileUrl)
+    public static async Task<MatrixMediaInfo?> DownloadAsync(string fileUrl)
     {
         try
         {
@@ -74,7 +78,7 @@ public static class HttpClientFactory
             {
                 fileName = Path.GetFileName(new Uri(fileUrl).LocalPath);
             }
-            var ret = new MatrixFileInfo()
+            var ret = new MatrixMediaInfo()
             {
                 FileName = fileName,
                 MediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty,

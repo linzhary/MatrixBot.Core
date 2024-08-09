@@ -1,0 +1,7 @@
+﻿[*.cs]
+
+# IDE1006: 命名样式
+dotnet_diagnostic.IDE1006.severity = silent
+
+# CA1822: 将成员标记为 static
+dotnet_diagnostic.CA1822.severity = silent
