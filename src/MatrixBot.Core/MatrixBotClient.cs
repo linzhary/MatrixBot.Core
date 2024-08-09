@@ -101,7 +101,7 @@ public class MatrixBotClient : IDisposable
             };
             Log.Information("Started MatrixBot.");
 
-            var matrixServices = _serviceProvider.GetMatrixServices();
+            var matrixServices = _serviceProvider.GetServices<MatrixService>();
             await Task.Run(async () =>
             {
                 foreach (var matrixService in matrixServices)

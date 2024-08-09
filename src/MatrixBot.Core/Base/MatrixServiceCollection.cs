@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -9,20 +10,23 @@ namespace MatrixBot.Core;
 
 public class MatrixServiceCollection
 {
-    private readonly List<Type> _serviceTypes = [];
-    private readonly List<object> _globalService;
-    internal MatrixServiceCollection(List<object> globalServices)
+    private readonly IServiceCollection _serviceCollection = new ServiceCollection();
+
+    internal MatrixServiceCollection(List<object> singletonServices)
     {
-        _globalService = globalServices;
-        _globalService.Add(this);
+        foreach (var service in singletonServices)
+        {
+            _serviceCollection.AddSingleton(service.GetType(), _ => service);
+        }
     }
+
     /// <summary>
     /// 注册服务
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public MatrixServiceCollection AddServices<T>()
+    public MatrixServiceCollection AddService<T>() where T : class
     {
-        _serviceTypes.Add(typeof(T));
+        AddService(typeof(T));
         return this;
     }
 
@@ -30,9 +34,16 @@ public class MatrixServiceCollection
     /// 注册服务
     /// </summary>
     /// <param name="type"></param>
-    public MatrixServiceCollection AddServices(Type type)
+    public MatrixServiceCollection AddService(Type type)
     {
-        _serviceTypes.Add(type);
+        if (type.IsAssignableTo(typeof(MatrixService)))
+        {
+            _serviceCollection.AddSingleton(typeof(MatrixService), type);
+        }
+        else
+        {
+            _serviceCollection.AddSingleton(type);
+        }
         return this;
     }
 
@@ -48,7 +59,10 @@ public class MatrixServiceCollection
             .Where(x => x.GetCustomAttribute<ManagedServiceAttribute>(true) is not null)
             .ToList();
 
-        _serviceTypes.AddRange(serviceTypes);
+        foreach (var serviceType in serviceTypes)
+        {
+            AddService(serviceType);
+        }
         return this;
     }
 
@@ -58,15 +72,6 @@ public class MatrixServiceCollection
     /// <returns></returns>
     public MatrixServiceProvider Build()
     {
-        return new MatrixServiceProvider(_serviceTypes, _globalService);
-    }
-
-    /// <summary>
-    /// 构造服务容器(作用域)
-    /// </summary>
-    /// <returns></returns>
-    internal MatrixScopedServiceProvider BuildScoped()
-    {
-        return new MatrixScopedServiceProvider(_serviceTypes, _globalService);
+        return new MatrixServiceProvider(_serviceCollection);
     }
 }
