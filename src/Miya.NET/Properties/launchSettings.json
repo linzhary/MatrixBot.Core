@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Miya.NET": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

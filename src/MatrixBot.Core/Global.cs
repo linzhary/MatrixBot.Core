@@ -9,4 +9,9 @@ internal class Global
         PropertyNameCaseInsensitive = true,
     };
 
+    public static bool IsRunningInContainer()
+    {
+        return Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+    }
+
 }

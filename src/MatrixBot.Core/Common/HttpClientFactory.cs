@@ -39,10 +39,11 @@ public static class HttpClientFactory
 
     public static HttpClient CreateClient()
     {
+        var webProxyUrl = Global.IsRunningInContainer() ? "host.docker.internal:7890" : "http://127.0.0.1:7890";
         var handler = new LoggingHandler(new HttpClientHandler
         {
             UseProxy = true,
-            Proxy = new WebProxy("http://127.0.0.1:7890")
+            Proxy = new WebProxy(webProxyUrl)
         });
         return new HttpClient(handler);
     }
