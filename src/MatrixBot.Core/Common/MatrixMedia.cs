@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MatrixBot.Core;
 
-public class MatrixMediaInfo
+public class MatrixMedia
 {
     public string FileName { get; set; } = string.Empty;
     public string MediaType { get; set; } = string.Empty;

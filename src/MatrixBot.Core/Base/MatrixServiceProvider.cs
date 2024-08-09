@@ -8,7 +8,17 @@ using System.Reflection;
 namespace MatrixBot.Core;
 
 /// <summary>
-/// 服务提供器
+/// 服务容器（作用域）
+/// </summary>
+/// <param name="serviceTypes"></param>
+/// <param name="defaultServices"></param>
+public class MatrixScopedServiceProvider(List<Type> serviceTypes, List<object> defaultServices) : MatrixServiceProvider(serviceTypes, defaultServices)
+{
+
+}
+
+/// <summary>
+/// 服务容器
 /// </summary>
 public class MatrixServiceProvider
 {
@@ -35,7 +45,7 @@ public class MatrixServiceProvider
     /// <summary>
     /// 设置服务之间的依赖关系
     /// </summary>
-    protected void SetServiceDependencies()
+    private void SetServiceDependencies()
     {
         foreach (var serviceInstance in _serviceInstances)
         {
@@ -58,7 +68,7 @@ public class MatrixServiceProvider
     /// </summary>
     /// <param name="serviceType"></param>
     /// <returns></returns>
-    protected void AddMatrixEndpoints(Type serviceType, object serviceInstance)
+    private void AddMatrixEndpoints(Type serviceType, object serviceInstance)
     {
         var methods = serviceType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
         foreach (var method in methods)
@@ -135,6 +145,17 @@ public class MatrixServiceProvider
     /// <param name="eventType"></param>
     /// <param name="endpoints"></param>
     /// <returns></returns>
+    internal T GetRequriedService<T>() where T : class
+    {
+        return (T)_serviceInstances.GetValueOrDefault(typeof(T))!;
+    }
+
+    /// <summary>
+    /// 获取Matrix服务实例
+    /// </summary>
+    /// <param name="eventType"></param>
+    /// <param name="endpoints"></param>
+    /// <returns></returns>
     internal MatrixService? GetMatrixService(Type serviceType)
     {
         if (!serviceType.IsAssignableTo(typeof(MatrixService))) return null;
@@ -150,4 +171,12 @@ public class MatrixServiceProvider
         return _serviceInstances.Values.Where(x => x is MatrixService).Cast<MatrixService>().ToList();
     }
 
+    /// <summary>
+    /// 创建作用域
+    /// </summary>
+    /// <returns></returns>
+    public MatrixScopedServiceProvider CreateScope()
+    {
+        return GetRequriedService<MatrixServiceCollection>().BuildScoped();
+    }
 }

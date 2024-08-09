@@ -13,7 +13,6 @@ public class MatrixBotClient : IDisposable
     internal readonly Storage _storage;
     private readonly int _syncTimeout;
     private MatrixServiceProvider _serviceProvider = default!;
-
     public MatrixServiceCollection Services { get; private set; }
     /// <summary>
     /// 

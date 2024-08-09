@@ -1,16 +1,7 @@
 ﻿using MatrixBot.Core;
 using Serilog;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Linq;
 using System.Net.Http.Json;
-using System.Reflection;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Miya.NET;
 
@@ -23,14 +14,14 @@ public class Setu : MatrixService
     public MatrixBotClient Client { get; set; } = default!;
 
     [Room.OnMessage]
-    public Task LogAsync(Context<Room.Message> ctx)
+    public Task LogAsync(Context<Message> ctx)
     {
         Log.Information("收到消息 [{RoomId}][{SenderId}]:{RawMessage}", ctx.RoomId, ctx.Sender, ctx.Content?.Body);
         return Task.CompletedTask;
     }
 
     [Room.OnMessage(@"^来\s*?(\d+)?\s*?[张份](\w+)?[色涩]图$")]
-    public async Task GetByKeywordAsync(Context<Room.Message> ctx)
+    public async Task GetByKeywordAsync(Context<Message> ctx)
     {
         var numString = ctx.MatchResult!.Groups[1].Value;
         var num = string.IsNullOrWhiteSpace(numString) ? 1 : Convert.ToInt32(numString);
@@ -64,30 +55,16 @@ public class Setu : MatrixService
                     var url = item.GetProperty("urls").GetProperty("small").GetString()!;
                     var width = item.GetProperty("width").GetDecimal()!;
                     var height = item.GetProperty("height").GetDecimal()!;
-                    var mediaInfo = await HttpClientFactory.DownloadAsync(url);
-                    if (mediaInfo is null)
+                    var media = await HttpClientFactory.DownloadAsync(url);
+                    if (media is null)
                     {
                         continue;
                     }
-                    using (mediaInfo.FileStream)
+                    using (media.FileStream)
                     {
                         //上传媒体文件
-                        mediaInfo.MatrixUrl = await ctx.Client.UploadMediaAsync(mediaInfo.FileName, mediaInfo.FileStream);
-                        await ctx.SendAsync(new Dictionary<string, object>()
-                        {
-                            { "msgtype" , "m.image" },
-                            { "body" , mediaInfo.FileName },
-                            { "url" , mediaInfo.MatrixUrl },
-                            { "info", new Dictionary<string, object?>()
-                                {
-                                    { "size", mediaInfo.FileSize },
-                                    { "mimetype", mediaInfo.MediaType },
-                                    { "w",width },
-                                    { "h",height },
-                                    { "thumbnail_url", mediaInfo.MatrixUrl }
-                                }
-                            }
-                        });
+                        media.MatrixUrl = await ctx.Client.UploadMediaAsync(media.FileName, media.FileStream);
+                        await ctx.SendAsync(new ImageMessage(media, width, height));
                         num--;
                     }
                     await Task.Delay(TimeSpan.FromMilliseconds(1000));

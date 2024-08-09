@@ -10,10 +10,11 @@ namespace MatrixBot.Core;
 public class MatrixServiceCollection
 {
     private readonly List<Type> _serviceTypes = [];
-    private readonly List<object> _defaultService;
-    internal MatrixServiceCollection(List<object> defaultServices)
+    private readonly List<object> _globalService;
+    internal MatrixServiceCollection(List<object> globalServices)
     {
-        _defaultService = defaultServices;
+        _globalService = globalServices;
+        _globalService.Add(this);
     }
     /// <summary>
     /// 注册服务
@@ -52,11 +53,20 @@ public class MatrixServiceCollection
     }
 
     /// <summary>
-    /// 构造服务提供器
+    /// 构造服务容器
     /// </summary>
     /// <returns></returns>
     public MatrixServiceProvider Build()
     {
-        return new MatrixServiceProvider(_serviceTypes, _defaultService);
+        return new MatrixServiceProvider(_serviceTypes, _globalService);
+    }
+
+    /// <summary>
+    /// 构造服务容器(作用域)
+    /// </summary>
+    /// <returns></returns>
+    internal MatrixScopedServiceProvider BuildScoped()
+    {
+        return new MatrixScopedServiceProvider(_serviceTypes, _globalService);
     }
 }

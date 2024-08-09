@@ -63,7 +63,7 @@ public static class HttpClientFactory
         return null;
     }
 
-    public static async Task<MatrixMediaInfo?> DownloadAsync(string fileUrl)
+    public static async Task<MatrixMedia?> DownloadAsync(string fileUrl)
     {
         try
         {
@@ -79,7 +79,7 @@ public static class HttpClientFactory
             {
                 fileName = Path.GetFileName(new Uri(fileUrl).LocalPath);
             }
-            var ret = new MatrixMediaInfo()
+            var ret = new MatrixMedia()
             {
                 FileName = fileName,
                 MediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty,
