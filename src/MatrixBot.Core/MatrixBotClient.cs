@@ -12,6 +12,9 @@ public class MatrixBotClient : IDisposable
     internal readonly HttpClient _httpClient;
     internal readonly Storage _storage;
     private readonly int _syncTimeout;
+    private MatrixServiceProvider _serviceProvider = default!;
+
+    public MatrixServiceCollection Services { get; private set; }
     /// <summary>
     /// 
     /// </summary>
@@ -20,7 +23,6 @@ public class MatrixBotClient : IDisposable
     public MatrixBotClient(int syncTimeout = 30000, int httpTimeout = 60000)
     {
         DotEnv.Load();
-        _syncTimeout = syncTimeout;
         // 配置 Serilog
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
@@ -39,9 +41,12 @@ public class MatrixBotClient : IDisposable
             )
             .CreateLogger();
 
+        _syncTimeout = syncTimeout;
+
+        _storage = new();
+        Services = new([this]);
         _httpClient = HttpClientFactory.CreateClient();
         _httpClient.Timeout = TimeSpan.FromMilliseconds(httpTimeout);
-        _storage = new Storage();
     }
 
     /// <summary>
@@ -83,6 +88,7 @@ public class MatrixBotClient : IDisposable
     /// <param name="password"></param>
     public async Task RunAsync(string serverUrl, string userName, string password)
     {
+        _serviceProvider = Services.Build();
         var cancellationTokenSource = new CancellationTokenSource();
         try
         {
@@ -96,7 +102,25 @@ public class MatrixBotClient : IDisposable
             };
             Log.Information("Started MatrixBot.");
 
-            await Task.Run(() => MatrixServiceProvider.Instance.OnReadyAsync(this, cancellationTokenSource.Token));
+            var matrixServices = _serviceProvider.GetMatrixServices();
+            await Task.Run(async () =>
+            {
+                foreach (var matrixService in matrixServices)
+                {
+                    var serviceName = matrixService.GetType().FullName;
+                    if (cancellationTokenSource.IsCancellationRequested) return;
+                    try
+                    {
+                        await matrixService.OnReadyAsync(this).ConfigureAwait(false);
+                        Log.Information("初始化[{service}]成功", serviceName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "初始化[{service}]失败", serviceName);
+                    }
+                }
+            }, cancellationTokenSource.Token);
+
 
             while (!cancellationTokenSource.IsCancellationRequested)
             {
@@ -150,7 +174,7 @@ public class MatrixBotClient : IDisposable
             if (room.Value.TimeLine.Events is null) continue;
             foreach (var e in room.Value.TimeLine.Events)
             {
-                if (!MatrixServiceProvider.Instance.TryGetEndpoints(e.Type, out var endpoints)) continue;
+                if (!_serviceProvider.TryGetEndpoints(e.Type, out var endpoints)) continue;
                 var ctx = Context.TryConvert(this, room.Key, e);
                 foreach (var endpoint in endpoints)
                 {

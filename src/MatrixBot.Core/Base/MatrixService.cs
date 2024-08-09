@@ -1,5 +1,6 @@
 ﻿namespace MatrixBot.Core;
 
+[ManagedService]
 public abstract class MatrixService
 {
     /// <summary>

@@ -5,6 +5,8 @@ namespace MatrixBot.Core;
 
 public abstract class Context
 {
+    public MatrixBotClient Client { get; internal set; } = default!;
+
     private static readonly Dictionary<string, Func<MatrixBotClient, string, MatrixEvent, Context>> _converters = [];
     static Context()
     {
@@ -22,7 +24,6 @@ public class Context<T> : Context
     public string EventId { get; set; } = default!;
     public string Sender { get; set; } = default!;
     public T? Content { get; set; } 
-    public MatrixBotClient Client { get; set; } = default!;
     public Match? MatchResult { get; internal set; }
     internal Context(MatrixBotClient client, string roomId, MatrixEvent e)
     {

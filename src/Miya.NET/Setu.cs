@@ -14,13 +14,13 @@ using System.Threading.Tasks;
 
 namespace Miya.NET;
 
+/// <summary>
+/// 涩图
+/// </summary>
 public class Setu : MatrixService
 {
-    public override Task OnReadyAsync(MatrixBotClient client)
-    {
-        //timer = new(_ => Task.Run(async () => await cacheSetuAsync(client)), default, 0, 1000);
-        return Task.CompletedTask;
-    }
+    [FromService]
+    public MatrixBotClient Client { get; set; } = default!;
 
     [Room.OnMessage]
     public Task LogAsync(Context<Room.Message> ctx)

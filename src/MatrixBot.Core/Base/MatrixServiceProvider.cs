@@ -1,42 +1,64 @@
 ﻿using Serilog;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 
 namespace MatrixBot.Core;
 
+/// <summary>
+/// 服务提供器
+/// </summary>
 public class MatrixServiceProvider
 {
-    public static readonly MatrixServiceProvider Instance = new();
-
-    private List<Type> _serviceTypes = default!;
-    private readonly ConcurrentDictionary<string, List<MatrixEndpoint>> _eventEndpoints = new();
-    
-    private MatrixServiceProvider() { }
+    private readonly ConcurrentDictionary<string, List<MatrixEndpoint>> _serviceEndpoints = [];
+    private readonly ConcurrentDictionary<Type, object> _serviceInstances = [];
+    internal MatrixServiceProvider(List<Type> serviceTypes, List<object> defaultServices)
+    {
+        _serviceInstances.TryAdd(typeof(MatrixServiceProvider), this);
+        foreach (var defaultService in defaultServices)
+        {
+            _serviceInstances.TryAdd(defaultService.GetType(), defaultService);
+        }
+        foreach (var serviceType in serviceTypes)
+        {
+            var serviceInstance = _serviceInstances.GetOrAdd(serviceType, Activator.CreateInstance(serviceType)!);
+            if (serviceType.IsAssignableTo(typeof(MatrixService)))
+            {
+                AddMatrixEndpoints(serviceType, serviceInstance);
+            }
+        }
+        SetServiceDependencies();
+    }
 
     /// <summary>
-    /// 注册服务
+    /// 设置服务之间的依赖关系
     /// </summary>
-    /// <param name="assembly"></param>
-    public void AddServices(Assembly assembly)
+    protected void SetServiceDependencies()
     {
-        _serviceTypes = assembly.GetExportedTypes()
-           .Where(x => x.IsAssignableTo(typeof(MatrixService)))
-           .ToList();
-
-        foreach (var serviceType in _serviceTypes)
+        foreach (var serviceInstance in _serviceInstances)
         {
-            AddServiceEndpoints(serviceType);
+            foreach (var propertyInfo in serviceInstance.Key.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                var fromService = propertyInfo.GetCustomAttribute<FromServiceAttribute>();
+                if (fromService != default)
+                {
+                    if (_serviceInstances.TryGetValue(propertyInfo.PropertyType, out var propertyInstance))
+                    {
+                        propertyInfo.SetValue(serviceInstance.Value, propertyInstance);
+                    }
+                }
+            }
         }
     }
 
     /// <summary>
-    /// 注册服务终结点
+    /// 注册Matrix服务终结点
     /// </summary>
     /// <param name="serviceType"></param>
     /// <returns></returns>
-    public void AddServiceEndpoints(Type serviceType)
+    protected void AddMatrixEndpoints(Type serviceType, object serviceInstance)
     {
         var methods = serviceType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
         foreach (var method in methods)
@@ -57,6 +79,7 @@ public class MatrixServiceProvider
                 .Where(x => x is IRuleMatcher)
                 .Cast<IRuleMatcher>()
                 .ToList();
+
             var parameter = method.GetParameters().FirstOrDefault();
 
             if (parameter is null)
@@ -70,24 +93,23 @@ public class MatrixServiceProvider
                 continue;
             }
 
-            var instanceParameter = Expression.Parameter(typeof(MatrixService), "instance");
+            var instanceParameter = Expression.Constant(serviceInstance);
             var contextParameter = Expression.Parameter(typeof(Context), "ctx");
             var callExpression = Expression.Call(
                 Expression.Convert(instanceParameter, serviceType),
                 method,
                 Expression.Convert(contextParameter, parameter.ParameterType));
-            var function = Expression.Lambda<Func<MatrixService, Context?, Task>>(callExpression, instanceParameter, contextParameter).Compile();
+            var function = Expression.Lambda<Func<Context?, Task>>(callExpression, contextParameter).Compile();
 
             foreach (var endpointType in endpointTypes)
             {
                 var endpoint = new MatrixEndpoint
                 {
-                    ServiceType = serviceType,
                     RuleMatchers = ruleMatchers,
                     Function = function,
                     FunctionName = $"[{serviceType.FullName}][{method.Name}]"
                 };
-                _eventEndpoints.AddOrUpdate(endpointType, [endpoint], (k, v) =>
+                _serviceEndpoints.AddOrUpdate(endpointType, [endpoint], (k, v) =>
                 {
                     v.Add(endpoint);
                     return v;
@@ -97,53 +119,35 @@ public class MatrixServiceProvider
     }
 
     /// <summary>
-    /// 获取服务实例
-    /// </summary>
-    /// <param name="eventType"></param>
-    /// <param name="endpoints"></param>
-    /// <returns></returns>
-    public MatrixService? GetService(Type serviceType)
-    {
-        return Activator.CreateInstance(serviceType) as MatrixService;
-    }
-
-    /// <summary>
-    /// 初始化应用
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    internal async Task OnReadyAsync(MatrixBotClient client, CancellationToken cancellationToken)
-    {
-        await Task.Run(async () =>
-        {
-            foreach (var serviceType in _serviceTypes)
-            {
-                if (cancellationToken.IsCancellationRequested) return;
-                try
-                {
-                    var service = Activator.CreateInstance(serviceType) as MatrixService;
-                    if (service is null) continue;
-                    await service.OnReadyAsync(client).ConfigureAwait(false);
-                    Log.Information("初始化[{service}]成功", serviceType.FullName);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "初始化[{service}]失败", serviceType.FullName);
-                }
-            }
-        }, cancellationToken);
-    }
-
-    /// <summary>
-    /// 获取事件终结点
+    /// 获取Matrix服务终结点
     /// </summary>
     /// <param name="eventType"></param>
     /// <param name="endpoints"></param>
     /// <returns></returns>
     internal bool TryGetEndpoints(string eventType, [NotNullWhen(true)] out List<MatrixEndpoint>? endpoints)
     {
-        return _eventEndpoints.TryGetValue(eventType, out endpoints) && endpoints != null;
+        return _serviceEndpoints.TryGetValue(eventType, out endpoints) && endpoints != null;
     }
 
+    /// <summary>
+    /// 获取服务实例
+    /// </summary>
+    /// <param name="eventType"></param>
+    /// <param name="endpoints"></param>
+    /// <returns></returns>
+    internal MatrixService? GetMatrixService(Type serviceType)
+    {
+        if (!serviceType.IsAssignableTo(typeof(MatrixService))) return null;
+        return _serviceInstances.GetValueOrDefault(serviceType) as MatrixService;
+    }
+
+    /// <summary>
+    /// 获取Matrix服务列表
+    /// </summary>
+    /// <returns></returns>
+    internal List<MatrixService> GetMatrixServices()
+    {
+        return _serviceInstances.Values.Where(x => x is MatrixService).Cast<MatrixService>().ToList();
+    }
 
 }
