@@ -20,10 +20,10 @@ public class MatrixServiceProvider
     {
         serviceCollection.AddSingleton(this);
         _serviceProvider = serviceCollection.BuildServiceProvider();
-        var serviceDescriptors = serviceCollection.Where(sd => sd.ServiceType != typeof(IServiceProvider)).ToList();
-        foreach (var serviceDescriptor in serviceDescriptors)
+        foreach (var serviceDescriptor in serviceCollection)
         {
             var serviceInstance = _serviceProvider.GetRequiredService(serviceDescriptor.ServiceType);
+            if (serviceDescriptor.ServiceType == typeof(MatrixService)) continue;
             if (serviceInstance is MatrixService)
             {
                 AddMatrixEndpoints(serviceDescriptor.ServiceType, serviceInstance);

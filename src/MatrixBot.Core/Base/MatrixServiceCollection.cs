@@ -16,17 +16,16 @@ public class MatrixServiceCollection
     {
         foreach (var service in singletonServices)
         {
-            _serviceCollection.AddSingleton(service.GetType(), _ => service);
+            _serviceCollection.AddSingleton(service.GetType(), service);
         }
     }
-
     /// <summary>
     /// 注册服务
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public MatrixServiceCollection AddService<T>() where T : class
     {
-        AddService(typeof(T));
+        _serviceCollection.AddSingleton<T>();
         return this;
     }
 
@@ -36,13 +35,11 @@ public class MatrixServiceCollection
     /// <param name="type"></param>
     public MatrixServiceCollection AddService(Type type)
     {
+        var instance = Activator.CreateInstance(type)!;
+        _serviceCollection.AddSingleton(type, instance);
         if (type.IsAssignableTo(typeof(MatrixService)))
         {
-            _serviceCollection.AddSingleton(typeof(MatrixService), type);
-        }
-        else
-        {
-            _serviceCollection.AddSingleton(type);
+            _serviceCollection.AddSingleton(typeof(MatrixService), instance);
         }
         return this;
     }
