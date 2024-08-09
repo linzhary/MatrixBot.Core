@@ -251,21 +251,4 @@ paket-files/
 .idea/
 *.sln.iml
 
-# SalaryCloud
-src/JZXF.SalaryCloud.Web/Logs/*
-src/JZXF.SalaryCloud.Web.Host/Logs/*
-src/JZXF.SalaryCloud.AuthServer/Logs/*
-src/JZXF.SalaryCloud.HttpApi.Host/Logs/*
-src/JZXF.SalaryCloud.HttpApi.Host/Logs/*
-src/JZXF.SalaryCloud.DbMigrator/Logs/*
-src/JZXF.SalaryCloud.Blazor.Server/Logs/*
-src/JZXF.SalaryCloud.Blazor.Server.Tiered/Logs/*
-src/JZXF.SalaryCloud.HttpApi.EnterpriseHost/Logs/*
-src/JZXF.SalaryCloud.HttpApi.TenantHost/Logs/*
-
-# Use abp install-libs to restore.
-**/wwwroot/libs/*
-src/JZXF.SalaryCloud.BackgroundJobExecutor/Logs
-src/JZXF.SalaryCloud.HttpApi.MiniProgram/Logs
-src/JZXF.SalaryCloud.HttpApi.KaMiniProgram/Logs
-src/JZXF.SalaryCloud.HttpApi.CustomerHost/Logs
+.env

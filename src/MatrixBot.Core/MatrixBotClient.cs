@@ -3,6 +3,7 @@ using Serilog;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using dotenv.net;
 
 namespace MatrixBot.Core;
 
@@ -18,6 +19,7 @@ public class MatrixBotClient : IDisposable
     /// <param name="httpTimeout">请求超时时间</param>
     public MatrixBotClient(int syncTimeout = 30000, int httpTimeout = 60000)
     {
+        DotEnv.Load();
         _syncTimeout = syncTimeout;
         // 配置 Serilog
         Log.Logger = new LoggerConfiguration()

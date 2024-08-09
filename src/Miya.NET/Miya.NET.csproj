@@ -17,5 +17,14 @@
   <ItemGroup>
     <ProjectReference Include="..\MatrixBot.Core\MatrixBot.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update=".env">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update=".env.template">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
 
