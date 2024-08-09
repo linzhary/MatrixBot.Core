@@ -40,32 +40,25 @@ public class Context<T> : Context
             Content = e.Content.Value.Deserialize<T>(Global.JsonSerializerOptions);
         }
     }
-    public async Task ReplyAsync(Dictionary<string, object> args)
+    public async Task ReplyAsync<TMessage>(TMessage message) where TMessage : Message
     {
-        var replyContent = new Dictionary<string, object?>()
+        message.RelatesTo = new()
         {
+            InReplyTo = new()
             {
-                "m.relates_to",
-                new Dictionary<string, object?>()
-                {
-                    {"m.in_reply_to",new{ event_id = EventId} }
-                }
-            },
-            {
-                "m.mentions",
-                new Dictionary<string, object?>()
-                {
-                    {"m.user_ids", new { Sender } }
-                }
+                EventId = EventId
             }
         };
-        foreach (var item in args)
+        message.Mentions = new()
         {
-            replyContent.Add(item.Key, item.Value);
-        }
-        await Client.SendRawMessageAsync(RoomId, replyContent);
+            UserIds = new()
+            {
+                Sender = Sender
+            }
+        };
+        await Client.SendRawMessageAsync(RoomId, message);
     }
-    public async Task SendAsync<TMessage>(TMessage message)
+    public async Task SendAsync<TMessage>(TMessage message) where TMessage : IMessage
     {
         await Client.SendRawMessageAsync(RoomId, message);
     }

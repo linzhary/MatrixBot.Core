@@ -27,11 +27,7 @@ public class Setu : MatrixService
         var num = string.IsNullOrWhiteSpace(numString) ? 1 : Convert.ToInt32(numString);
         if (num > 5)
         {
-            await ctx.ReplyAsync(new()
-                {
-                    { "msgtype" , "m.text" },
-                    { "body" , "一次不许看这么多哦❤️杂鱼~" },
-                });
+            await ctx.ReplyAsync(new TextMessage("一次不许看这么多哦❤️杂鱼~"));
             return;
         }
         var keyword = ctx.MatchResult!.Groups[2].Value;
@@ -43,11 +39,7 @@ public class Setu : MatrixService
                 var data = resJson.GetProperty("data").EnumerateArray();
                 if (!data.Any())
                 {
-                    await ctx.ReplyAsync(new()
-                    {
-                        { "msgtype" , "m.text" },
-                        { "body" , "一张也没有哦❤️杂鱼~" },
-                    });
+                    await ctx.ReplyAsync(new TextMessage("一张也没有哦❤️杂鱼~"));
                     return;
                 }
                 foreach (var item in data)
