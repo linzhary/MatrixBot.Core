@@ -50,7 +50,7 @@ TemporaryDependencyNodeTargetIdentifier=net11.0
 /warnaserror-
 /utf8output
 /deterministic+
-/langversion:Preview
+/langversion:14.0
 /features:runtime-async=on
 /warnaserror+:NU1605,SYSLIB0011
 
