@@ -5,7 +5,7 @@ namespace MatrixBot.Core;
 public class Message : IMessage
 {
     [JsonPropertyName("body")]
-    public string Body { get; set; } = default!
+    public string Body { get; set; } = default!;
     [JsonPropertyName("msgtype")]
     public string MsgType { get; set; } = default!;
     [JsonPropertyName("format")]
