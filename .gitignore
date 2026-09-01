@@ -252,3 +252,5 @@ paket-files/
 *.sln.iml
 
 .env
+.bitfun/
+/.bitfun/search/flashgrep-index/
